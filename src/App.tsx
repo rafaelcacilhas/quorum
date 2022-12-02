@@ -1,89 +1,33 @@
-import React, {useEffect,useState} from 'react'
-import Papa from 'papaparse'
-
-interface IBills {
-  id: Number,
-  title: String,
-  sponsor_id: Number
-}
-interface ILegislators {
-  id: Number,
-  name: String,
-}
-interface IVotes {
-  id: Number,
-  bill_id: Number
-}
-interface IVoteResults {
-  id: Number,
-  legislator_id: Number,
-  vote_id: Number,
-  vote_type: Number
-}
+import useRetrieveData from './utils/useRetrieveData';
 
 const FAVOR = 1;
 const OPPOSITION = 2;
 
 export default function App() {
 
-  const [bills,setBills] = useState<[IBills]>();
-  const [legislators,setLegislators] = useState<ILegislators>();
-  const [votes,setVotes] = useState<IVotes>();
-  const [voteResults,setVoteResults] = useState<[IVoteResults]>();
-  const [isLoading,setIsLoading] = useState<Boolean>(true)
+  const { 
+    bills,legislators, voteResults, votes,
+    isLoading
+  } = useRetrieveData()
 
-  useEffect(() => {
-    async function getData(target:String) {
-      const response = await fetch(target)
-      const reader = response.body.getReader()
-      const result = await reader.read() 
-      const decoder = new TextDecoder('utf-8')
-      const csv = decoder.decode(result.value) 
-      const results = Papa.parse(csv, { header: true })
-      return results
-    }
+  const getBillVotes = (billId: Number) => {
 
-    getData('./bills.csv').then((payload) => {
-      setBills(payload.data)    
-    })  
-    getData('./legislators.csv').then((payload) => {
-      setLegislators(payload.data)    
-    })
-    getData('./vote_results.csv').then((payload) => {
-      setVoteResults(payload.data)
-    }) 
-    getData('./votes.csv').then((payload) => {
-      setVotes(payload.data)    
-    })  
-  }, [])
-
-  useEffect(() => {
-    if(bills && legislators && voteResults && votes){
-      setIsLoading(false)
-    }
-  },[bills,legislators,voteResults, votes])
-
-
-  //This should be useMemo
-  const getBillVotes = (billId) => {
-
-    let voteId = votes
+    const voteId = votes!
       .find((item) => {
         return item.bill_id === billId
         })?.id
 
-    let votesInFavor = voteResults
-      .filter((vote) => {
-        return vote.vote_id === voteId
-      })
+    const votesInBill = voteResults!
+    .filter((vote) => {
+      return vote.vote_id === voteId
+    })
+
+    let votesInFavor = votesInBill
       .filter((vote) => {
         return vote.vote_type == FAVOR
       })
 
-    let votesInOpposition = voteResults
-      .filter((vote) => {
-        return vote.vote_id === voteId
-      })
+    let votesInOpposition = votesInBill
       .filter((vote) => {
         return vote.vote_type == OPPOSITION
       })
@@ -91,69 +35,67 @@ export default function App() {
     return `${votesInFavor.length} / ${ votesInOpposition.length}`   
   }
 
-
-  const getPrimarySponsor = (primarySponsorId) =>{
-    let sponsor = legislators.find((item) => {
+  const getPrimarySponsor = (primarySponsorId: Number) =>{
+    let sponsor = legislators!
+      .find((item) => {
         return item.id === primarySponsorId
     })
 
     if(sponsor) {
-      return sponsor?.name  
+      return sponsor.name  
     }
     else {
-      return <b> {primarySponsorId} </b> 
+      return primarySponsorId 
     }
   }
 
-  const getLegislatorVotes = (legislatorId) => {
-    const inFavor = voteResults
-      .filter(  (item) => {
-        return item.legislator_id == legislatorId
-      })
-      .filter( (item) => {
-          return item.vote_type == FAVOR
-      })
-
-    const inOpposition = voteResults
-      .filter(  (item) => {
-        return item.legislator_id == legislatorId
-      })
-      .filter( (item) => {
-          return item.vote_type == OPPOSITION
+  const getLegislatorVotes = (legislatorId:Number) => {
+    
+    const legislatorVotes = voteResults!
+    .filter(  (voteResult) => {
+      return voteResult.legislator_id === legislatorId
+    })
+    
+    const inFavor = legislatorVotes
+      .filter( (voteResult) => {
+          return voteResult.vote_type == FAVOR
       })
 
-
-    console.log('medium', 
-    voteResults
-      .filter((item)=>{return item.vote_type==2}).length)
-
+    const inOpposition = legislatorVotes
+      .filter( (voteResult) => {
+          return voteResult.vote_type == OPPOSITION
+      })
 
     return `${inFavor.length} / ${inOpposition.length}`
 
   }
 
-
   return (
     <div className="app">
       {isLoading? 
         <>
-          Carregando
+          Loading
         </>
         :
         <>
           <h3>Bills</h3> 
-          {bills.map((item) => {
-            return(
-              <ul key={item.id}>
-                <li >  title: {item.title}  </li>
 
-                <li> 
-                  Primary Sponsor:
-                  {getPrimarySponsor(item.sponsor_id)}
+          {bills!
+          .map((bill) => {
+            return(
+              <ul key={bill.id.toString()}>
+                <li key={`billTitle-${bill.id}`} >  
+                  Title: {bill.title}  
                 </li>
 
-                <li> 
-                  Supported / Opposed by: {getBillVotes(item.id) } 
+                <li key={`billSponsor-${bill.id}`}> 
+                  Primary Sponsor:
+                  {getPrimarySponsor(bill.sponsor_id)}
+                </li>
+
+                <li key={`billSup-${bill.id}`}> 
+                  Supported / Opposed by: 
+                  {getBillVotes(bill.id) } 
                 </li>
               </ul>
             )
@@ -162,56 +104,60 @@ export default function App() {
 
           <br/>
 
-          
           <h3>Legislators</h3>
 
-          {legislators.map((item) => {
+          {legislators!.map((legislator) => {
             return(
-              <ul key={item.id}>
-               <li > name: {item.name} </li>
-               <li > Supported / Opposed: 
-                 {getLegislatorVotes(item.id)} 
+              <ul key={legislator.id.toString()}>
+               <li key={`legName-${legislator.id}`} > 
+                Name: {legislator.name} 
+              </li>
+               <li key={`legSup-${legislator.id}`} > 
+                  Supported / Opposed: 
+                 {getLegislatorVotes(legislator.id)} 
                </li>
               </ul>
             )
             })
           } 
 
+          {true? 
+            <>
+            </>
+            :
+            <>
+              <h3>Votes</h3>
+              {votes!.map((item) => {
+                return(
+                  <ul key={item.id.toString()}>
+                    <li key={`voteId-${item.id}`} > id: {item.id} </li>
+                    <li key={`voteBill-${item.id}`} > Bill id: {item.bill_id}  </li>
+                  </ul>
+                )
+                })
+              }
 
-          <h3>Votes</h3>
-          {votes.map((item) => {
-            return(
-              <ul key={item.id}>
-               <li > id: {item.id} </li>
-               <li> Bill id: {item.bill_id}  </li>
-              </ul>
-            )
-            })
+              <br/>
+
+              <h3>Vote Results</h3>
+              {voteResults!.map((item) => {
+                return(
+                  <ul key={item.id.toString()}>
+                  <li key={`voteResId-${item.id}`} >  id: {item.id} </li>
+                  <li key={`voteLegId-${item.id}`} >  Legislator id: {item.legislator_id}  </li>
+                  <li key={`voteId-${item.id}`} >  Vote id: {item.vote_id}  </li>
+                  <li key={`voteType-${item.id}`} >  Vote type: {item.vote_type}  </li>
+                  </ul>
+                )
+                })
+              }
+
+              <br/>
+
+            </>
           }
-
-          <br/>
-
-          <h3>Vote Results</h3>
-          {voteResults.map((item) => {
-            return(
-              <ul key={item.id}>
-               <li > id: {item.id} </li>
-               <li> Legislator id: {item.legislator_id}  </li>
-               <li> Vote id: {item.vote_id}  </li>
-               <li> Vote type: {item.vote_type}  </li>
-              </ul>
-            )
-            })
-          }
-
-          <br/>
-
-
-
-
 
         </>
-    
       }
     </div>
   )
