@@ -10,7 +10,7 @@ The files 'bills.csv' and 'legislators-support-oppose-count.csv' in the root fol
 1. Discuss your solution’s time complexity. What tradeoffs did you make?
 
     Since the data is loaded from a CSV everything
-    is commited to memory, which makes the data manipulation very fast but is not an option if the data files start to get much bigger. Since no operation is larger than O(n) no further optimizations were made.
+    is commited to memory, which makes the data manipulation very fast but is not an option if the data files start to get much bigger. Since no operation is larger than O(n²) no further optimizations were made.
 
 2. How would you change your solution to account for future columns that might be
 requested, such as “Bill Voted On Date” or “Co-Sponsors”?
