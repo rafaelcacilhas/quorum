@@ -4,6 +4,8 @@ npm install
 <br />
 npm run dev
 
+The files 'bills.csv' and 'legislators-support-oppose-count.csv' in the root folder are the outputs obtained.
+
 
 1. Discuss your solution’s time complexity. What tradeoffs did you make?
 
