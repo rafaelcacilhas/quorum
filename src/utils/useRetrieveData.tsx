@@ -42,6 +42,6 @@ export default function useRetrieveData(){
       setIsLoading(false)
     }
   },[bills,legislators,voteResults, votes])
-
+  
   return {bills,legislators,voteResults, votes,isLoading}
 }

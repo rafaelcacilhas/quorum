@@ -1,4 +1,6 @@
 import useRetrieveData from './utils/useRetrieveData';
+import Papa from 'papaparse'
+import {IBillOutput, ILegislatorOutput} from "./utils/types"
 
 const FAVOR = 1;
 const OPPOSITION = 2;
@@ -10,8 +12,9 @@ export default function App() {
     isLoading
   } = useRetrieveData()
 
-  const getBillVotes = (billId: Number) => {
-
+  // Should probably make a services folder 
+  // inside utils to store these methods.
+  const getBillSupport = (billId: Number) => {
     const voteId = votes!
       .find((item) => {
         return item.bill_id === billId
@@ -27,12 +30,26 @@ export default function App() {
         return vote.vote_type == FAVOR
       })
 
+    return votesInFavor.length
+  }
+  
+  const getBillOpposition = (billId: Number) => {
+    const voteId = votes!
+      .find((item) => {
+        return item.bill_id === billId
+        })?.id
+
+    const votesInBill = voteResults!
+    .filter((vote) => {
+      return vote.vote_id === voteId
+    })
+
     let votesInOpposition = votesInBill
       .filter((vote) => {
         return vote.vote_type == OPPOSITION
       })
 
-    return `${votesInFavor.length} / ${ votesInOpposition.length}`   
+    return votesInOpposition.length
   }
 
   const getPrimarySponsor = (primarySponsorId: Number) =>{
@@ -45,12 +62,11 @@ export default function App() {
       return sponsor.name  
     }
     else {
-      return primarySponsorId 
+      return 'Unknown' 
     }
   }
 
-  const getLegislatorVotes = (legislatorId:Number) => {
-    
+  const getLegislatorSupport = (legislatorId:Number) => {
     const legislatorVotes = voteResults!
     .filter(  (voteResult) => {
       return voteResult.legislator_id === legislatorId
@@ -61,13 +77,71 @@ export default function App() {
           return voteResult.vote_type == FAVOR
       })
 
+    return inFavor.length 
+  }
+
+  const getLegislatorOpposition = (legislatorId:Number) => {
+    const legislatorVotes = voteResults!
+    .filter(  (voteResult) => {
+      return voteResult.legislator_id === legislatorId
+    })
+    
     const inOpposition = legislatorVotes
       .filter( (voteResult) => {
           return voteResult.vote_type == OPPOSITION
       })
 
-    return `${inFavor.length} / ${inOpposition.length}`
+    return inOpposition.length
+  }
 
+  const downloadCSV = () =>{
+    generateLegislatorsCsv();
+    generateBillsCsv();
+  }
+
+  const generateLegislatorsCsv = () => {
+    let legislatorOutput:[ILegislatorOutput] =  [ null as unknown as ILegislatorOutput  ]
+    for(let i = 0; i < legislators!.length ; i++){
+      legislatorOutput[i] = {
+        id:legislators![i].id,
+        name:legislators![i].name,     
+        num_supported_bills: getLegislatorSupport(legislators![i].id),
+        num_opposed_bills: getLegislatorOpposition(legislators![i].id),
+      }
+    }
+
+    var csv = Papa.unparse(legislatorOutput!);
+    var csvData = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+    var csvURL =  null;
+    csvURL = window.URL.createObjectURL(csvData);
+
+    var tempLink = document.createElement('a');
+    tempLink.href = csvURL;
+    tempLink.setAttribute('download', 'legislators-support-oppose-count.csv');
+    tempLink.click();
+  }
+
+  const generateBillsCsv = () => {
+    let billsOutput:[IBillOutput] =  [ null as unknown as IBillOutput  ]
+    for(let i = 0; i < bills!.length ; i++){
+      billsOutput[i] = {
+        id:bills![i].id,
+        title:bills![i].title,     
+        supporter_count: getBillSupport(bills![i].id),
+        opposer_count: getBillOpposition(bills![i].id),
+        primary_sponsor: getPrimarySponsor(bills![i].sponsor_id)
+      }
+    }
+
+    var csv = Papa.unparse(billsOutput!);
+    var csvData = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+    var csvURL =  null;
+    csvURL = window.URL.createObjectURL(csvData);
+
+    var tempLink = document.createElement('a');
+    tempLink.href = csvURL;
+    tempLink.setAttribute('download', 'bills.csv');
+    tempLink.click();
   }
 
   return (
@@ -78,6 +152,11 @@ export default function App() {
         </>
         :
         <>
+
+          <button onClick={downloadCSV} >
+            Download
+          </button>
+
           <h3>Bills</h3> 
 
           {bills!
@@ -95,7 +174,7 @@ export default function App() {
 
                 <li key={`billSup-${bill.id}`}> 
                   Supported / Opposed by: 
-                  {getBillVotes(bill.id) } 
+                  {getBillSupport(bill.id) }/{getBillOpposition(bill.id)} 
                 </li>
               </ul>
             )
@@ -114,48 +193,12 @@ export default function App() {
               </li>
                <li key={`legSup-${legislator.id}`} > 
                   Supported / Opposed: 
-                 {getLegislatorVotes(legislator.id)} 
+                  {getLegislatorSupport(legislator.id)} / {getLegislatorOpposition(legislator.id)}
                </li>
               </ul>
             )
             })
           } 
-
-          {true? 
-            <>
-            </>
-            :
-            <>
-              <h3>Votes</h3>
-              {votes!.map((item) => {
-                return(
-                  <ul key={item.id.toString()}>
-                    <li key={`voteId-${item.id}`} > id: {item.id} </li>
-                    <li key={`voteBill-${item.id}`} > Bill id: {item.bill_id}  </li>
-                  </ul>
-                )
-                })
-              }
-
-              <br/>
-
-              <h3>Vote Results</h3>
-              {voteResults!.map((item) => {
-                return(
-                  <ul key={item.id.toString()}>
-                  <li key={`voteResId-${item.id}`} >  id: {item.id} </li>
-                  <li key={`voteLegId-${item.id}`} >  Legislator id: {item.legislator_id}  </li>
-                  <li key={`voteId-${item.id}`} >  Vote id: {item.vote_id}  </li>
-                  <li key={`voteType-${item.id}`} >  Vote type: {item.vote_type}  </li>
-                  </ul>
-                )
-                })
-              }
-
-              <br/>
-
-            </>
-          }
 
         </>
       }
